@@ -5,7 +5,7 @@ const cors = require('cors');
 
 // CORS options
 const corsOptions = {
-  origin: 'https://yourfrontenddomain.netlify.app', // Replace with your Netlify domain
+  origin: 'https://frabjous-babka-0dfff5.netlify.app/', // Replace with your Netlify domain
   optionsSuccessStatus: 200 // For legacy browser support
 };
 
