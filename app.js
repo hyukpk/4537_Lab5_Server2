@@ -89,6 +89,12 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("Access-Control-Allow-Methods", "*");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+
     if (req.method == "POST" && parsedUrl.pathname == "/api/4rows") {
         addFourPatients(res);
         
