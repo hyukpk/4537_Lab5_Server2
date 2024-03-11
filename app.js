@@ -1,59 +1,125 @@
 const sql = require('mssql');
 require('dotenv').config();
-const cors = require('cors');
+const http = require('http');
+const url = require('url');
 
+const {
+    addFourRows,
+    getPatientTable
+} = require("./prompts/queries");
 
-// CORS options
-const corsOptions = {
-  origin: 'https://frabjous-babka-0dfff5.netlify.app/', // Replace with your Netlify domain
-  optionsSuccessStatus: 200 // For legacy browser support
-};
-
-app.use(cors(corsOptions));
+const {
+    couldNotQueryDatabase,
+    ServerListening
+} = require("./prompts/strings");
 
 const config = {
+    server: process.env.DB_SERVER,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER,
     database: process.env.DB_DATABASE,
     options: {
-      encrypt: true, // Necessary for Azure SQL Database
-      trustServerCertificate: false // Change to true if you have issues with certificate
+        encrypt: true, // Necessary for Azure SQL Database
+        trustServerCertificate: false // Change to true if you have issues with certificate
     }
-  };
+};
 
-sql.connect(config).then(pool => {
-    // You can use pool.request() to interact with your database
-  }).catch(err => {
-    console.error('Database connection failed: ', err);
-  });
+console.log(process.env.DB_SERVER);
+console.log(process.env.DB_USER);
 
-// Example to insert data
-app.post('/add-patient', async (req, res) => {
+async function queryMSQL(queryString) {
     try {
-      const { name, dateOfBirth } = req.body;
-      const pool = await sql.connect(config);
-      const result = await pool.request()
-        .input('name', sql.VarChar, name)
-        .input('dateOfBirth', sql.DateTime, new Date(dateOfBirth))
-        .query('INSERT INTO Patients (name, dateOfBirth) VALUES (@name, @dateOfBirth)');
-  
-      res.json({ message: 'Patient added successfully', result });
-    } catch (err) {
-      console.error('Error inserting patient: ', err);
-      res.status(500).json({ message: 'Error inserting patient', err });
+        let pool = await sql.connect(config);
+        let products = await pool.request().query(queryString);
+        return products.recordset;
+    } catch (error) {
+        console.log(error);
+        return null; // or any default value indicating error
     }
-  });
-  
-  // Example to retrieve data
-  app.get('/get-patients', async (req, res) => {
+}
+
+
+function sendResponse(res, statusCode, contentType, body) {
+    res.writeHead(statusCode, { "Content-Type": contentType });
+    res.end(JSON.stringify(body));
+}
+
+async function addFourPatients(res) {
     try {
-      const pool = await sql.connect(config);
-      const result = await pool.request().query('SELECT * FROM Patients');
-      res.json(result.recordset);
-    } catch (err) {
-      console.error('Error retrieving patients: ', err);
-      res.status(500).json({ message: 'Error retrieving patients', err });
+        let pool = await sql.connect(config);
+
+        const patientsToAdd = [
+            {name: 'Sara Brown', dob: '1901-01-01' },
+            {name: 'John Smith', dob: '1941-01-01' },
+            {name: 'Jack Ma', dob: '1961-01-30' },
+            {name: 'Elon Musk', dob: '1999-01-01' }
+        ];
+
+        for (const patient of patientsToAdd) {
+            try {
+                const { query, parameters } = addFourRows(patient.name, patient.dob);
+                const request = pool.request();
+                
+                parameters.forEach(p => request.input(p.name, p.type, p.value));
+                
+                await request.query(query);
+            } catch (error) {
+                console.error('Error inserting patient:', patient.name, error);
+                // Break or continue based on your error handling policy
+            }
+        }
+        
+        console.log('Four patients added successfully.');
+
+        // Query the table after adding patients
+        const queryResult = await queryMSQL(getPatientTable);
+
+        // Send response with the query result
+        sendResponse(res, 200, "application/json", {
+            result: queryResult
+        });
+    } catch (error) {
+        console.error('Error adding patients:', error);
     }
-  });
-  
+}
+
+const server = http.createServer(async (req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "*");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method == "POST" && parsedUrl.pathname == "/api/4rows") {
+        addFourPatients(res);
+        
+        //TODO: return updated table with three rows added, send as a response
+    } else if (req.method == "POST" && parsedUrl.pathname == "/api/custom") {
+        let body = "";
+        req.on("data", (chunk) => {
+            body += chunk.toString();
+        });
+        req.on("end", async() => {
+            try {
+                const data = JSON.parse(body);
+                const result = await queryMSQL(data.query);
+                sendResponse(res, 200, "application/json", {
+                    success: "good job"
+                });
+            } catch (e) {
+                sendResponse(res, 400, "application/json", {
+                    error: couldNotQueryDatabase
+                });
+            }
+        });
+    } else if (req.method == "GET" && parsedUrl.pathname == "/api/custom") {
+        const query = parsedUrl.query.query;
+        const result = await queryMSQL(query);
+        sendResponse(res, 200, "application/json", {
+            query: result
+        });
+
+    } 
+});
+
+const port = process.env.port || 8888;
+server.listen(port, () => console.log(`ServerListening(${port})`));
