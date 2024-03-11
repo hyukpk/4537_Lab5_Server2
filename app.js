@@ -21,15 +21,19 @@ const config = {
     options: {
         encrypt: true, // Necessary for Azure SQL Database
         trustServerCertificate: false // Change to true if you have issues with certificate
+    },
+    pool: {
+        max: 10,
+        min: 0,
+        idleTimeoutMillis: 30000
     }
 };
 
-console.log(process.env.DB_SERVER);
-console.log(process.env.DB_USER);
+let globalPoolPromise = sql.connect(config);
 
 async function queryMSQL(queryString) {
     try {
-        let pool = await sql.connect(config);
+        let pool = globalPoolPromise;
         let products = await pool.request().query(queryString);
         return products.recordset;
     } catch (error) {
@@ -46,7 +50,7 @@ function sendResponse(res, statusCode, contentType, body) {
 
 async function addFourPatients(res) {
     try {
-        let pool = await getPool();
+        let pool = globalPoolPromise;
         const patientsToAdd = [/* Your patients array */];
 
         await Promise.all(patientsToAdd.map(async (patient) => {
