@@ -95,10 +95,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-    if (req.method == "POST" && parsedUrl.pathname == "/api/4rows") {
-        addFourPatients(res);
-        
-        //TODO: return updated table with three rows added, send as a response
+      if (req.method == "POST" && parsedUrl.pathname == "/api/4rows") {
+        try {
+            await addFourPatients(res); // Wait for patients to be added before sending response
+        } catch (error) {
+            console.error('Error adding patients:', error);
+            sendResponse(res, 500, "application/json", { error: "Failed to add patients" });
+        }
     } else if (req.method == "POST" && parsedUrl.pathname == "/api/custom") {
         let body = "";
         req.on("data", (chunk) => {
@@ -108,23 +111,23 @@ const server = http.createServer(async (req, res) => {
             try {
                 const data = JSON.parse(body);
                 const result = await queryMSQL(data.query);
-                sendResponse(res, 200, "application/json", {
-                    success: "good job"
-                });
+                sendResponse(res, 200, "application/json", { success: "good job" });
             } catch (e) {
-                sendResponse(res, 400, "application/json", {
-                    error: couldNotQueryDatabase
-                });
+                console.error('Error executing custom query:', e);
+                sendResponse(res, 400, "application/json", { error: couldNotQueryDatabase });
             }
         });
     } else if (req.method == "GET" && parsedUrl.pathname == "/api/custom") {
-        const query = parsedUrl.query.query;
-        const result = await queryMSQL(query);
-        sendResponse(res, 200, "application/json", {
-            query: result
-        });
-
+        try {
+            const query = parsedUrl.query.query;
+            const result = await queryMSQL(query);
+            sendResponse(res, 200, "application/json", { query: result });
+        } catch (error) {
+            console.error('Error executing custom query:', error);
+            sendResponse(res, 400, "application/json", { error: couldNotQueryDatabase });
+        }
     } 
+    
 });
 
 const port = process.env.port || 8888;
