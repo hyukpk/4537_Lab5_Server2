@@ -46,42 +46,64 @@ function sendResponse(res, statusCode, contentType, body) {
 
 async function addFourPatients(res) {
     try {
-        let pool = await sql.connect(config);
+        let pool = await getPool();
+        const patientsToAdd = [/* Your patients array */];
 
-        const patientsToAdd = [
-            {name: 'Sara Brown', dob: '1901-01-01' },
-            {name: 'John Smith', dob: '1941-01-01' },
-            {name: 'Jack Ma', dob: '1961-01-30' },
-            {name: 'Elon Musk', dob: '1999-01-01' }
-        ];
+        await Promise.all(patientsToAdd.map(async (patient) => {
+            const { query, parameters } = addFourRows(patient.name, patient.dob);
+            const request = pool.request();
+            parameters.forEach(p => request.input(p.name, p.type, p.value));
+            await request.query(query);
+        }));
 
-        for (const patient of patientsToAdd) {
-            try {
-                const { query, parameters } = addFourRows(patient.name, patient.dob);
-                const request = pool.request();
-                
-                parameters.forEach(p => request.input(p.name, p.type, p.value));
-                
-                await request.query(query);
-            } catch (error) {
-                console.error('Error inserting patient:', patient.name, error);
-                // Break or continue based on your error handling policy
-            }
-        }
-        
         console.log('Four patients added successfully.');
-
-        // Query the table after adding patients
         const queryResult = await queryMSQL(getPatientTable);
-
-        // Send response with the query result
-        sendResponse(res, 200, "application/json", {
-            result: queryResult
-        });
+        sendResponse(res, 200, "application/json", { result: queryResult });
     } catch (error) {
         console.error('Error adding patients:', error);
+        sendResponse(res, 500, "application/json", { error: "Failed to add patients" });
     }
 }
+
+
+// async function addFourPatients(res) {
+//     try {
+//         let pool = await sql.connect(config);
+
+//         const patientsToAdd = [
+//             {name: 'Sara Brown', dob: '1901-01-01' },
+//             {name: 'John Smith', dob: '1941-01-01' },
+//             {name: 'Jack Ma', dob: '1961-01-30' },
+//             {name: 'Elon Musk', dob: '1999-01-01' }
+//         ];
+
+//         for (const patient of patientsToAdd) {
+//             try {
+//                 const { query, parameters } = addFourRows(patient.name, patient.dob);
+//                 const request = pool.request();
+                
+//                 parameters.forEach(p => request.input(p.name, p.type, p.value));
+                
+//                 await request.query(query);
+//             } catch (error) {
+//                 console.error('Error inserting patient:', patient.name, error);
+//                 // Break or continue based on your error handling policy
+//             }
+//         }
+        
+//         console.log('Four patients added successfully.');
+
+//         // Query the table after adding patients
+//         const queryResult = await queryMSQL(getPatientTable);
+
+//         // Send response with the query result
+//         sendResponse(res, 200, "application/json", {
+//             result: queryResult
+//         });
+//     } catch (error) {
+//         console.error('Error adding patients:', error);
+//     }
+// }
 
 const server = http.createServer(async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
