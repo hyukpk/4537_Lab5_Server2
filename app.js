@@ -33,7 +33,7 @@ let globalPoolPromise = sql.connect(config);
 
 async function queryMSQL(queryString) {
     try {
-        let pool = globalPoolPromise;
+        let pool = await globalPoolPromise;
         let products = await pool.request().query(queryString);
         return products.recordset;
     } catch (error) {
@@ -50,7 +50,7 @@ function sendResponse(res, statusCode, contentType, body) {
 
 async function addFourPatients(res) {
     try {
-        let pool = globalPoolPromise;
+        let pool = await globalPoolPromise;
         const patientsToAdd = [/* Your patients array */];
 
         await Promise.all(patientsToAdd.map(async (patient) => {
@@ -136,7 +136,6 @@ const server = http.createServer(async (req, res) => {
         req.on("end", async() => {
             try {
                 const data = JSON.parse(body);
-                const result = await queryMSQL(data.query);
                 sendResponse(res, 200, "application/json", { success: "good job" });
             } catch (e) {
                 console.error('Error executing custom query:', e);
